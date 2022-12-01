@@ -2,6 +2,17 @@
   "name": "itemshop",
   "description": "A typed safe Omegga plugin.",
   "author": "astrsk",
-  "config": {},
+  "config": {
+    "checkRole": {
+      "description": "Role to check when using shop creation and editing commands",
+      "default": "Admin",
+      "type": "string"
+    },
+    "whitelist": {
+      "description": "Is the check-role a whitelist or blacklist",
+      "default": true,
+      "type": "boolean"
+    }
+  },
   "commands": []
 }
