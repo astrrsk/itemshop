@@ -405,7 +405,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       this.omegga.whisper(clicker, store.description ? store.description : '');
 
       if (store.contents.length != 0) {
-        store.contents.forEach((v, i) => {
+        store.contents.forEach((v) => {
           this.omegga.whisper(clicker, `${v.name}: $${v.price.toFixed(2)}`);
         });
       } else this.omegga.whisper(clicker, 'This store is empty...');
