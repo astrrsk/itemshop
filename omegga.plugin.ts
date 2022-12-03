@@ -1,5 +1,5 @@
 import OmeggaPlugin, { OL, PS, PC, OmeggaPlayer } from 'omegga';
-import Currency from 'currency';
+import Currency from './currency';
 
 type Config = { checkRole: string, whitelist: boolean };
 type Storage = { shops: any[] };
@@ -94,7 +94,7 @@ function deconstructArgs(args: string[]): string[] {
 
         if (nested.match(/['"]$/)) {
           i = j;
-          const stringified = gathered.toString().replace(/['"]/g, '').replace(/,/g, ' ');
+          const stringified = gathered.toString().replace(/^['"]|['"]$/g, '').replace(/,/g, ' ');
           results.push(stringified);
           break;
         }
@@ -157,7 +157,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
     let [myStore, _] = await this.checkIfShopExists(owner.id, shopName, currentStores);
 
     if (myStore) {
-      this.omegga.whisper(owner, `Shop with the name '${shopName}' already exists!`);
+      this.omegga.whisper(owner, `<color="ff0000">!</> Shop with the name <color="ffff00">${shopName}</> already exists!`);
       return;
     }
 
@@ -179,14 +179,14 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
     let [myStore, idx] = await this.checkIfShopExists(owner.id, shopName, playerStores);
 
     if (!myStore) {
-      this.omegga.whisper(owner, `Unable to find shop '${shopName}'. (Shop names are case-sensitive, maybe check that?)`);
+      this.omegga.whisper(owner, `<color="ff0000">!</> Unable to find shop <color="ffff00"${shopName}</>. (Shop names are case-sensitive, maybe check that?)`);
       return
     }
 
     newItem = newItem.replace(/['"]/g, ''); // Remove quotes if left behind
     const wep = WEAPON_MAP[newItem.toLowerCase().trim()];
     if (!wep) {
-      this.omegga.whisper(owner, `Unable to add item ${newItem}.`);
+      this.omegga.whisper(owner, `<color="ff0000">!</> Unable to add item <color="d100d6">${newItem}</>.`);
       return;
     }
 
@@ -208,7 +208,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
 
     for (let i = 0; i < myStore.contents.length; i++) {
       if (myStore.contents[i].item == wep) {
-        this.omegga.whisper(owner, `Shop ${myStore.shopName} already contains ${capitalName}!`);
+        this.omegga.whisper(owner, `<color="ff0000">!</> Shop <color="ffff00">${myStore.shopName}</> already contains <color="d100d6">${capitalName}</>!`);
         return;
       }
     }
@@ -216,7 +216,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
     myStore.contents.push(product);
     playerStores[idx] = myStore;
     this.store.set(DS_STORES + owner.id, playerStores);
-    this.omegga.whisper(owner, `Added ${capitalName} to shop ${myStore.shopName}!`);
+    this.omegga.whisper(owner, `Added <color="d100d6">${capitalName}</> to shop <color="ffff00">${myStore.shopName}</>!`);
   }
 
 
@@ -224,11 +224,15 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
     const currency = new Currency(this.omegga);
     await currency.loadPlugin();
 
+    // Ensure every player currently online has a name stored
     const currentPlayers = await this.omegga.getPlayers()
     currentPlayers.forEach((p) => {
       this.store.set(DS_IDS + p.id, p.name);
     });
 
+    // Commands
+
+    // shop:open
     this.omegga.on('cmd:shop:open', async (speaker: string, ...args: string[]) => {
       const plr = this.omegga.getPlayer(speaker);
       if (!this.canUseCommand(plr)) {
@@ -239,7 +243,11 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       const decon = deconstructArgs(args);
       let [name, desc] = decon;
       if (!name) {
-        this.omegga.whisper(plr, 'A name is required.');
+        this.omegga.whisper(plr, '<color="ff0000">!</> A name is required.');
+        return;
+      }
+      if (name.match(/[<>]/)) {
+        this.omegga.whisper(plr, '<color="ff0000">!</> Please exclude <code><</> and <code>></> from your shop name.');
         return;
       }
       if (!desc || desc == undefined) {
@@ -249,7 +257,63 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       this.registerShop(plr, name, desc);
     });
 
+    this.omegga.on('cmd:shop:desc', async (speaker: string, ...args: string[]) => {
+      const plr = this.omegga.getPlayer(speaker);
 
+      if (!this.canUseCommand(plr)) {
+        this.omegga.whisper(plr, 'You do not have permission to use this command.');
+        return;
+      }
+
+      const decon = deconstructArgs(args);
+      if (decon.length < 2) {
+        this.omegga.whisper(plr, '<color="ff0000">!</> Invalid number of arguments.');
+        return;
+      }
+      let [shopName, desc] = decon;
+
+      const stores = await this.getStore(plr.id);
+      const [myShop, idx] = await this.checkIfShopExists(plr.id, shopName, stores);
+
+      if (!myShop) {
+        this.omegga.whisper(plr, `<color="ff0000">!</> Store <color="ffff00">${shopName}</> does not exist.`);
+        return;
+      }
+
+      myShop.description = desc;
+      stores[idx] = myShop;
+      this.store.set(DS_STORES + plr.id, stores);
+      this.omegga.whisper(plr, `Successfully updated description of shop <color="ffff00">${shopName}</>!`);
+    });
+
+    // shop:close
+    this.omegga.on('cmd:shop:close', async (speaker: string, ...args: any[]) => {
+      const plr = this.omegga.getPlayer(speaker);
+
+      if (!this.canUseCommand(plr)) {
+        this.omegga.whisper(plr, 'You do not have permission to use this command.');
+        return;
+      }
+
+      const decon = deconstructArgs(args);
+      if (decon.length < 1) {
+        this.omegga.whisper(plr, '<color="ff0000">!</> Please provide a store name.');
+        return;
+      }
+      const [shopName] = decon;
+
+
+      let stores = await this.getStore(plr.id);
+      let [myStore, idx] = await this.checkIfShopExists(plr.id, shopName, stores);
+
+      if (myStore) {
+        stores.splice(idx, 1);
+        this.store.set(DS_STORES + plr.id, stores);
+        this.omegga.whisper(plr, `Successfully removed shop <color="ffff00">${shopName}</>.`);
+      } else this.omegga.whisper(plr, `<color="ff0000">!</> Unable to find shop <color="ffff00">${shopName}</>.`);
+    });
+
+    // shop:owned
     this.omegga.on('cmd:shop:owned', async (speaker: string) => {
       const plr = this.omegga.getPlayer(speaker);
       if (!this.canUseCommand(plr)) {
@@ -262,16 +326,16 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       if (stores.length > 0) {
         this.omegga.whisper(plr, 'Owned stores:');
         stores.forEach((s) => {
-          this.omegga.whisper(plr, s.shopName);
+          this.omegga.whisper(plr, `<color="ffff00">${s.shopName}</>`);
         });
-      } else this.omegga.whisper(plr, 'You have no stores!');
+      } else this.omegga.whisper(plr, '<color="ff0000">!</> You have no stores!');
     });
 
-
+    // shop:view
     this.omegga.on('cmd:shop:view', async (speaker: string, ...args: any[]) => {
       const plr = this.omegga.getPlayer(speaker);
       if (!args || args.length == 0) {
-        this.omegga.whisper(plr, 'Please provide a store name.');
+        this.omegga.whisper(plr, '<color="ff0000">!</> Please provide a store name.');
         return;
       }
 
@@ -281,7 +345,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       const [myStore, _] = await this.checkIfShopExists(plr.id, shopName);
 
       if (!myStore) {
-        this.omegga.whisper(plr, `Unable to find store '${shopName}'`);
+        this.omegga.whisper(plr, `<color="ff0000">!</> Unable to find store <color="ffff00">${shopName}</>`);
         return;
       }
 
@@ -297,7 +361,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       }
     });
 
-
+    // shop:additem
     this.omegga.on('cmd:shop:additem', async (speaker: string, ...args: any[]) => {
       const plr = this.omegga.getPlayer(speaker);
       if (!this.canUseCommand(plr)) {
@@ -306,27 +370,28 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       }
 
       if (!args || args.length < 3) {
-        this.omegga.whisper(speaker, 'Invalid number of arguments.');
+        this.omegga.whisper(speaker, '<color="ff0000">!</> Invalid number of arguments.');
         return;
       }
 
       const decon = deconstructArgs(args);
       if (decon.length != 3) {
-        this.omegga.whisper(plr, 'Invalid number of arguments!');
+        this.omegga.whisper(plr, '<color="ff0000">!</> Invalid number of arguments!');
         return;
       }
 
       let [shopName, itemName, price] = decon;
 
       if (!parseFloat(price)) {
-        this.omegga.whisper(plr, 'Price must be a number!');
+        this.omegga.whisper(plr, '<color="ff0000">!</> Price must be a number!');
         return;
       }
 
-      this.addOption(plr, shopName, itemName, parseFloat(price)); // TODO: Move this out of a function
+      this.addOption(plr, shopName, itemName, await currency.round(parseFloat(price))); // TODO: Move this out of a function
     });
 
 
+    // shop:removeitem
     this.omegga.on('cmd:shop:removeitem', async (speaker: string, ...args: []) => {
       const plr = this.omegga.getPlayer(speaker);
 
@@ -341,7 +406,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
 
       const decon: string[] = deconstructArgs(args);
       if (decon.length != 2) {
-        this.omegga.whisper(plr, 'Invalid number of arguments.');
+        this.omegga.whisper(plr, '<color="ff0000">!</> Invalid number of arguments.');
         return;
       }
       let [shopName, itemName] = decon;
@@ -350,13 +415,13 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       let [myStore, idx] = await this.checkIfShopExists(plr.id, shopName, stores);
 
       if (!myStore) {
-        this.omegga.whisper(plr, `Store named ${shopName} does not exist.`);
+        this.omegga.whisper(plr, `<color="ff0000">!</> Store named <color="ffff00">${shopName}</> does not exist.`);
         return;
       }
 
       const wep = WEAPON_MAP[itemName.toLowerCase()];
       if (!wep) {
-        this.omegga.whisper(plr, `Item '${itemName}' unavailable.`);
+        this.omegga.whisper(plr, `<color="ff0000">!</> Item <color="d100d6">${itemName}</> unavailable.`);
         return;
       }
 
@@ -371,11 +436,11 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
 
       stores[idx] = myStore;
       this.store.set(DS_STORES + plr.id, stores);
-      this.omegga.whisper(plr, `Removed item from shop.`);
+      this.omegga.whisper(plr, `Removed <color="d100d6">${itemName}</> from shop.`);
     });
 
 
-
+    // Debug command for removing all stores of runner
     this.omegga.on('cmd:debugremove', async (speaker: string) => {
       const plr = this.omegga.getPlayer(speaker);
 
@@ -383,6 +448,8 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       this.omegga.whisper(plr, 'Cleared data stores');
     });
 
+
+    // Events
     this.omegga.on('event:store', async (clicker: OmeggaPlayer, owner: string, shopName: string) => {
       if (!owner || !shopName) return;
       const vendor = this.omegga.getPlayer(owner);
@@ -415,45 +482,17 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       this.omegga.whisper(clicker, store.description ? store.description : '');
 
       if (store.contents.length != 0) {
-        store.contents.forEach((v) => {
-          this.omegga.whisper(clicker, `${v.name}: $${v.price.toFixed(2)}`);
+        store.contents.forEach(async (v) => {
+          this.omegga.whisper(clicker, `${v.name}: ${await currency.format(v.price)}`);
         });
       } else this.omegga.whisper(clicker, 'This store is empty...');
     });
-
-
-    this.omegga.on('cmd:shop:close', async (speaker: string, ...args: any[]) => {
-      const plr = this.omegga.getPlayer(speaker);
-
-      if (!this.canUseCommand(plr)) {
-        this.omegga.whisper(plr, 'You do not have permission to use this command.');
-        return;
-      }
-
-      const decon = deconstructArgs(args);
-      if (decon.length < 1) {
-        this.omegga.whisper(plr, 'Please provide a store name.');
-        return;
-      }
-      const [shopName] = decon;
-
-
-      let stores = await this.getStore(plr.id);
-      let [myStore, idx] = await this.checkIfShopExists(plr.id, shopName, stores);
-
-      if (myStore) {
-        stores.splice(idx, 1);
-        this.store.set(DS_STORES + plr.id, stores);
-        this.omegga.whisper(plr, `Successfully removed shop ${shopName}.`);
-      } else this.omegga.whisper(plr, `Unable to find shop ${shopName}.`);
-    });
-
 
     this.omegga.on('join', async (player: OmeggaPlayer) => {
       this.store.set(DS_IDS + player.id, player.name);
     });
 
-    return { registeredCommands: ['shop:open', 'shop:owned', 'shop:view', 'shop:additem', 'shop:removeitem', 'shop:close'] };
+    return { registeredCommands: ['shop:open', 'shop:desc', 'shop:owned', 'shop:view', 'shop:additem', 'shop:removeitem', 'shop:close'] };
   }
 
   async stop() { }
