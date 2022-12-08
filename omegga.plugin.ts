@@ -493,11 +493,9 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
 
       await this.currency.set(plr.id, 'currency', myWallet);
       plr.giveItem(buyingItem.item);
-      console.log(this.config.payVendors);
       let vendorWallet = this.config.payVendors == true ? await this.currency.getCurrency(shop.ownerID) : null;
       if (this.config.payVendors == true) {
         vendorWallet += buyingItem.price;
-        console.log('paying vendor');
         await this.currency.set(shop.ownerID, 'currency', vendorWallet);
       }
 
