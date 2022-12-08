@@ -13,16 +13,9 @@ Your plugin will be installed via omegga install gh:astrsk/itemshop
 
 A typed safe plugin for [omegga](https://github.com/brickadia-community/omegga).
 
-This is an auto-generated README file. Please change it before publishing your plugin!
-
-Be sure to edit the script in `setup.sh` to configure your plugin on install, or
-remove it entirely if it is unnecessary.
-
 ## Install
 
-`omegga install gh:astrsk/itemshop`
-
-_TODO: more steps...?_
+`omegga install gh:astrrsk/currency-itemshop`
 
 ## Usage
 
