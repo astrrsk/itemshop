@@ -9,7 +9,7 @@ Your plugin will be installed via omegga install gh:astrsk/itemshop
 
 -->
 
-# itemshop
+# currency-itemshop
 
 A typed safe plugin for [omegga](https://github.com/brickadia-community/omegga).
 
