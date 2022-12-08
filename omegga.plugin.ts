@@ -545,7 +545,7 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
       const vendor = this.omegga.getPlayer(owner);
 
       if (this.shoppers.hasOwnProperty(clicker.name)) {
-        this.omegga.whisper(clicker, `<color="ff0000">!</> You are already browsing a shop. Either buy an item or type <code>/shop:leave</> to leave the current shop.`);
+        this.omegga.whisper(clicker, `<color="ff0000">!</> You are already browsing a shop. Either buy an item or type <code>/leave</> to leave the current shop.`);
         return;
       };
 
