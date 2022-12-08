@@ -12,6 +12,11 @@
       "description": "Is the check-role a whitelist or blacklist",
       "default": true,
       "type": "boolean"
+    },
+    "payVendors": {
+      "description": "Do stores pay their vendors? Use this if stores are offered by the server, rather than other players",
+      "default": true,
+      "type": "boolean"
     }
   },
   "commands": []
